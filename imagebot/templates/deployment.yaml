@@ -1,0 +1,61 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "imagebot.fullname" . }}
+  labels:
+    {{- include "imagebot.labels" . | nindent 4 }}
+spec:
+  {{- if not .Values.autoscaling.enabled }}
+  {{- if or .Values.environment.prod .Values.environment.preprod }}
+  replicas: 2
+  {{- else }}
+  replicas : {{ .Values.replicaCount}}     
+  {{- end }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "imagebot.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "imagebot.selectorLabels" . | nindent 8 }}
+        {{- if .Values.environment.preprod}}
+        env: k8s-preprod
+        {{- end }}
+        {{- if .Values.environment.prod}}
+        env: k8s-prod
+        {{- end }}
+        {{- if .Values.environment.test}}
+        env: k8s
+        {{- end }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "imagebot.serviceAccountName" . }}
+      containers:
+        - name: {{ .Chart.Name }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args:
+          {{- toYaml .Values.image.args | nindent 10 }}
+          ports:
+           - containerPort: {{ .Values.service.port }}
+          livenessProbe:
+          {{- toYaml .Values.livenessProbe | nindent 12 }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          volumeMounts:
+          - name: secrets
+            mountPath: /etc/secrets
+      volumes:
+      - name: secrets
+        secret:
+          secretName: imagebot-secrets
