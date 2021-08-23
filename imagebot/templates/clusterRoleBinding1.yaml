@@ -1,0 +1,10 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ include "imagebot.fullname" . }}
+  labels:
+  {{- include "imagebot.labels" . | nindent 4 }}
+rules:
+- apiGroups: [ "", "apps" ]
+  resources: [ "deployments", "namespaces", "pods" ]
+  verbs: [ "get", "list", "apply", "create", "update", "delete", "patch" ]
