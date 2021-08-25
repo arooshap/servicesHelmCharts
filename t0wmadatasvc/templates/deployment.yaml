@@ -4,12 +4,13 @@ metadata:
   name: {{ include "t0wmadatasvc.fullname" . }}
   labels:
     {{- include "t0wmadatasvc.labels" . | nindent 4 }}
+  namespace: tzero
 spec:
   {{- if not .Values.autoscaling.enabled }}
-  {{- if or .Values.environment.prod .Values.environment.preprod }}
-  replicas: 5
+  {{- if or .Values.environment.prod .Values.environment.preprod}}
+  replicas: {{ .Values.replicaCount.prod }}
   {{- else }}
-  replicas : {{ .Values.replicaCount}}     
+  replicas: {{ .Values.replicaCount.test }}
   {{- end }}
   {{- end }}
   selector:
@@ -42,10 +43,10 @@ spec:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
       containers:
         - name: {{ .Chart.Name }}
-          securityContext:
-            {{- toYaml .Values.securityContext | nindent 12 }}
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
+          securityContext:
+          {{- toYaml .Values.securityContext | nindent 12 }}
           ports:
            - containerPort: {{ .Values.service.port }}
              name: {{ .Values.service.name }}
@@ -53,12 +54,12 @@ spec:
            - containerPort: {{ .Values.serviceMon.port }}
              name: {{ .Values.serviceMon.name }}
              protocol: {{ .Values.serviceMon.protocol }}
-          livenessProbe:
-          {{- toYaml .Values.livenessProbe | nindent 12 }}
           command:
-          {{- toYaml .Values.command | nindent 10 }}
+          {{- toYaml .Values.image.command | nindent 10 }}
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
+          livenessProbe:
+          {{- toYaml .Values.livenessProbe | nindent 12 }}
           volumeMounts:
           - name: proxy-secrets
             mountPath: /etc/proxy
@@ -80,16 +81,13 @@ spec:
 {{- if or .Values.environment.prod .Values.environment.preprod }}
           - name: logs
             mountPath: /data/srv/logs/t0wmadatasvc
-        - name: {{ .Values.image2.name }}
-          image: {{ .Values.image2.name }}
-          args: [
-            "-c", "/etc/filebeat.yml",
-            "-e",
-          ]
+        - name: {{ .Values.imageFilebeat.name }}
+          image: {{ .Values.imageFilebeat.name }}
+          args: {{ .Values.imageFilebeat.args }}
           env:
-          {{- toYaml .Values.image2env | nindent 10 }}
+          {{- toYaml .Values.imageFilebeat.env | nindent 10 }}
           resources:
-          {{- toYaml .Values.image2resources | nindent 12 }}
+          {{- toYaml .Values.imageFilebeatResources | nindent 12 }}
           volumeMounts:
           - name: logs
             mountPath: /data/srv/logs/t0wmadatasvc
@@ -104,6 +102,8 @@ spec:
           - name: varlibdockercontainers
             mountPath: /var/lib/docker/containers
             readOnly: true
+          securityContext:
+          {{- toYaml .Values.imageFilebeatSecurityContext | nindent 12 }}
 {{- end }}
       volumes:
       - name: proxy-secrets

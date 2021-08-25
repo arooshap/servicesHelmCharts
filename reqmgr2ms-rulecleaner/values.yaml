@@ -1,4 +1,4 @@
-# Default values for reqmgr2.
+# Default values for reqmgr2ms-rulecleaner.
 # This is a YAML-formatted file.
 # Declare variables to be passed into your templates.
 
@@ -6,13 +6,17 @@ replicaCount: 1
 
 image:
   repository: cmssw/reqmgr2ms
-  pullPolicy: IfNotPresent
+  name: ms-rulecleaner
+  pullPolicy: Always
   # Overrides the image tag whose default is the chart appVersion.
-  tag: "latest"
+  tag: "HG2108h-v3"
+  command:
+  - /bin/bash
+  - /opt/setup-certs-and-run/setup-certs-and-run.sh
 
 imagePullSecrets: []
-nameOverride: ""
-fullnameOverride: ""
+nameOverride: "ms-rulecleaner"
+fullnameOverride: "ms-rulecleaner"
 
 environment:
   prod: false
@@ -21,7 +25,7 @@ environment:
 
 serviceAccount:
   # Specifies whether a service account should be created
-  create: true
+  create: false
   # Annotations to add to the service account
   annotations: {}
   # The name of the service account to use.
@@ -35,16 +39,21 @@ lifecycle:
       - bash
       - -c
       - sudo chmod 0777 /data/srv/logs/reqmgr2ms; sudo chown _reqmgr2ms:_reqmgr2ms /data/srv/logs/reqmgr2ms
+
 podAnnotations:
   prometheus.io/scrape: 'true'
   prometheus.io/port: "18244"
 
-podSecurityContext: 
-  runAsUser: 0
-  runAsGroup: 0
-
 securityContext: 
   privileged: true
+
+podSecurityContext:
+  runAsUser: 1000
+  runAsGroup: 1000
+  fsGroup: 2000
+
+imageFilebeatSecurityContext:
+  allowPrivilegeEscalation: false
 
 service:
   type: ClusterIP
@@ -57,6 +66,34 @@ serviceMon:
   protocol: TCP
   name: rulecleaner-mon
 
+
+resources:
+  requests:
+    memory: "256Mi"
+    cpu: "200m"
+  limits:
+    memory: "3Gi"
+    cpu: "1000m"
+
+imageFilebeat:
+  name: ms-rulecleaner-filebeat
+  path: docker.elastic.co/beats/filebeat:7.12.0
+  env:
+  - name: MY_POD_NAME
+    valueFrom:
+      fieldRef:
+        apiVersion: v1
+        fieldPath: metadata.name
+  args: [
+  "-c", "/etc/filebeat.yml",
+  "-e",
+   ]
+
+imageFilebeatResources:
+  requests:
+    memory: "50Mi"
+    cpu: "50m"
+
 livenessProbe:
   exec:
     command:
@@ -68,34 +105,10 @@ livenessProbe:
   initialDelaySeconds: 120
   periodSeconds: 10
 
-resources:
-  requests:
-    memory: "256Mi"
-    cpu: "200m"
-  limits:
-    memory: "3Gi"
-    cpu: "1000m"
-
-command:
-- /bin/bash
-- /opt/setup-certs-and-run/setup-certs-and-run.sh
-
-image2:
-  name: ms-rulecleaner-filebeat
-  path: docker.elastic.co/beats/filebeat:7.12.0
-
-image2resources:
-  requests:
-    memory: "50Mi"
-    cpu: "50m"
-
-image2env:
-- name: MY_POD_NAME
-  valueFrom:
-    fieldRef:
-      apiVersion: v1
-      fieldPath: metadata.name
-
+#      initContainers:
+#      - name: checkcouchdb
+#        image: busybox:1.28
+#        command: ['sh', '-c', 'until nslookup couchdb.couchdb; do echo "Waiting for couchdb"; sleep 10; done;']
 ingress:
   enabled: false
   annotations: {}

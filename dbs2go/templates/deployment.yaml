@@ -4,12 +4,13 @@ metadata:
   name: {{ include "dbs2go.fullname" . }}
   labels:
     {{- include "dbs2go.labels" . | nindent 4 }}
+  namespace: dbs
 spec:
   {{- if not .Values.autoscaling.enabled }}
-  {{- if or .Values.environment.prod .Values.environment.preprod }}
-  replicas: 3
+  {{- if or .Values.environment.prod .Values.environment.preprod}}
+  replicas: {{ .Values.replicaCount.prod }}
   {{- else }}
-  replicas : {{ .Values.replicaCount}}     
+  replicas: {{ .Values.replicaCount.test }}
   {{- end }}
   {{- end }}
   selector:
@@ -38,15 +39,10 @@ spec:
         {{- toYaml . | nindent 8 }}
       {{- end }}
       serviceAccountName: {{ include "dbs2go.serviceAccountName" . }}
-      securityContext:
-        {{- toYaml .Values.podSecurityContext | nindent 8 }}
       containers:
         - name: {{ .Chart.Name }}
-          securityContext:
-            {{- toYaml .Values.securityContext | nindent 12 }}
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
-          ports:
           ports:
            - containerPort: {{ .Values.service.port }}
              name: {{ .Values.service.name }}
@@ -55,11 +51,11 @@ spec:
              name: {{ .Values.serviceMon.name }}
              protocol: {{ .Values.serviceMon.protocol }}
           env: 
-          {{- toYaml .Values.env | nindent 10 }}
+          {{- toYaml .Values.image.env | nindent 10 }}
           livenessProbe:
           {{- toYaml .Values.livenessProbe | nindent 12 }}
           command:
-          {{- toYaml .Values.command | nindent 10 }}
+          {{- toYaml .Values.image.command | nindent 10 }}
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
           volumeMounts:
@@ -78,16 +74,14 @@ spec:
 {{- if or .Values.environment.prod .Values.environment.preprod }}
           - name: logs
             mountPath: /data/logs
-        - name: {{ .Values.image2.name }}
-          image: {{ .Values.image2.path }}
-          args: [
-            "-c", "/etc/filebeat.yml",
-            "-e",
-          ]
+        - name: {{ .Values.imageFilebeat.name }}
+          image: {{ .Values.imageFilebeat.path }}
+          args: 
+          {{- toYaml .Values.imageFilebeat.args | nindent 10 }}
           env:
-          {{- toYaml .Values.image2env | nindent 10 }}
+          {{- toYaml .Values.imageFilebeat.env | nindent 10 }}
           resources:
-          {{- toYaml .Values.resources | nindent 12 }}
+          {{- toYaml .Values.imageFilebeatResources | nindent 12 }}
           volumeMounts:
           - name: logs
             mountPath: /data/logs

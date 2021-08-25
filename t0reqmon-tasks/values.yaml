@@ -1,14 +1,18 @@
 # Default values for t0_reqmon.
 # This is a YAML-formatted file.
 # Declare variables to be passed into your templates.
+shareProcessNamespace: true
 
 replicaCount: 1
 
 image:
   repository: cmssw/t0_reqmon
-  pullPolicy: IfNotPresent
+  pullPolicy: Always
   # Overrides the image tag whose default is the chart appVersion.
-  tag: "latest"
+  tag: "HG2108h-v3"
+  command:
+  - /bin/bash
+  - /opt/setup-certs-and-run/setup-certs-and-run.sh
 
 imagePullSecrets: []
 nameOverride: ""
@@ -32,23 +36,16 @@ podAnnotations:
   prometheus.io/scrape: 'true'
   prometheus.io/port: "18243"
 
-podSecurityContext: 
-  runAsUser: 0
-  runAsGroup: 0
-
 securityContext: 
   privileged: true
 
-service:
-  type: ClusterIP
-  port: 8243
-  protocol: TCP
-  name: t0reqmon
+podSecurityContext:
+  runAsUser: 1000
+  runAsGroup: 1000
+  fsGroup: 2000
 
-serviceMon:
-  port: 18243
-  protocol: TCP
-  name: t0reqmon-mon
+imageFilebeatSecurityContext:
+  allowPrivilegeEscalation: false
 
 livenessProbe:
   exec:
@@ -61,6 +58,13 @@ livenessProbe:
   initialDelaySeconds: 120
   periodSeconds: 10
 
+service:
+  type: ClusterIP
+  port: 8243
+  protocol: TCP
+  name: t0reqmon
+
+
 resources:
   requests:
     memory: "512Mi"
@@ -69,25 +73,25 @@ resources:
     memory: "3Gi"
     cpu: "1000m"
 
-command:
-- /bin/bash
-- /opt/setup-certs-and-run/setup-certs-and-run.sh
 
-image2:
+imageFilebeat:
   name: t0reqmon-filebeat
   path: docker.elastic.co/beats/filebeat:7.12.0
+  args: [
+  "-c", "/etc/filebeat.yml",
+  "-e",
+  ]
+  env:
+  - name: MY_POD_NAME
+    valueFrom:
+      fieldRef:
+        apiVersion: v1
+        fieldPath: metadata.name
 
-image2resources:
+imageFilebeatResources:
   requests:
     memory: "50Mi"
     cpu: "50m"
-
-image2env:
-- name: MY_POD_NAME
-  valueFrom:
-    fieldRef:
-      apiVersion: v1
-      fieldPath: metadata.name
 
 ingress:
   enabled: false
@@ -101,7 +105,6 @@ ingress:
   #  - secretName: chart-example-tls
   #    hosts:
   #      - chart-example.local
-
 
 autoscaling:
   enabled: false

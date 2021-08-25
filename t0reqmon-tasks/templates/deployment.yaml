@@ -4,6 +4,7 @@ metadata:
   name: {{ include "t0reqmon-tasks.fullname" . }}
   labels:
     {{- include "t0reqmon-tasks.labels" . | nindent 4 }}
+  namespace: tzero
 spec:
   {{- if not .Values.autoscaling.enabled }}
   replicas: {{ .Values.replicaCount}}     
@@ -38,16 +39,16 @@ spec:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
       containers:
         - name: {{ .Chart.Name }}
-          securityContext:
-            {{- toYaml .Values.securityContext | nindent 12 }}
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
-          livenessProbe:
-          {{- toYaml .Values.livenessProbe | nindent 12 }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
           command:
-          {{- toYaml .Values.command | nindent 10 }}
+          {{- toYaml .Values.image.command | nindent 10 }}
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
+          livenessProbe:
+          {{- toYaml .Values.livenessProbe | nindent 12 }}
           volumeMounts:
           - name: proxy-secrets
             mountPath: /etc/proxy
@@ -69,16 +70,14 @@ spec:
 {{- if or .Values.environment.prod .Values.environment.preprod }}
           - name: logs
             mountPath: /data/srv/logs/t0_reqmon
-        - name: {{ .Values.image2.name }}
-          image: {{ .Values.image2.name }}
-          args: [
-            "-c", "/etc/filebeat.yml",
-            "-e",
-          ]
+        - name: {{ .Values.imageFilebeat.name }}
+          image: {{ .Values.imageFilebeat.name }}
+          args:
+          {{- toYaml .Values.imageFilebeat.args | nindent 10 }}
           env:
-          {{- toYaml .Values.image2env | nindent 10 }}
+          {{- toYaml .Values.imageFilebeat.env | nindent 10 }}
           resources:
-          {{- toYaml .Values.image2resources | nindent 12 }}
+          {{- toYaml .Values.imageFilebeatResources | nindent 12 }}
           volumeMounts:
           - name: logs
             mountPath: /data/srv/logs/t0_reqmon
@@ -93,6 +92,8 @@ spec:
           - name: varlibdockercontainers
             mountPath: /var/lib/docker/containers
             readOnly: true
+          securityContext:
+          {{- toYaml .Values.imageFilebeatSecurityContext | nindent 12 }}
 {{- end }}
       volumes:
       - name: proxy-secrets

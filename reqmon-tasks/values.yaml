@@ -1,14 +1,17 @@
-# Default values for workqueue.
+# Default values for reqmon-tasks.
 # This is a YAML-formatted file.
 # Declare variables to be passed into your templates.
 
 replicaCount: 1
 
 image:
-  repository: cmssw/reqmon-tasks
-  pullPolicy: IfNotPresent
+  repository: cmssw/reqmon
+  pullPolicy: Always
   # Overrides the image tag whose default is the chart appVersion.
-  tag: "latest"
+  tag: "HG2108h-v3"
+  command:
+  - /bin/bash
+  - /opt/setup-certs-and-run/setup-certs-and-run.sh
 
 imagePullSecrets: []
 nameOverride: ""
@@ -21,7 +24,7 @@ environment:
 
 serviceAccount:
   # Specifies whether a service account should be created
-  create: true
+  create: false
   # Annotations to add to the service account
   annotations: {}
   # The name of the service account to use.
@@ -31,34 +34,28 @@ serviceAccount:
 podAnnotations: {}
 #         prometheus.io/scrape: 'true'
 
-podSecurityContext: 
-  runAsUser: 0
-  runAsGroup: 0
-
 securityContext: 
   privileged: true
+
+podSecurityContext:
+  runAsUser: 1000
+  runAsGroup: 1000
+  fsGroup: 2000
+
+imageFilebeatSecurityContext:
+  allowPrivilegeEscalation: false
 
 service:
   type: ClusterIP
   port: 8249
   protocol: TCP
-  name: reqmon-tasks
+  name: reqmon
 
 serviceMon:
   port: 18249
   protocol: TCP
-  name: reqmon-tasks-mon
+  name: reqmon-mon
 
-livenessProbe:
-  exec:
-    command:
-    - cmsweb-ping
-    - "--url=http://localhost:8249/wmstatsserver/data/info"
-    - "--authz=/etc/hmac/hmac"
-    - -verbose
-    - "0"
-  initialDelaySeconds: 120
-  periodSeconds: 10
 
 resources:
   requests:
@@ -68,25 +65,25 @@ resources:
     memory: "8Gi"
     cpu: "1000m"
 
-command:
-- /bin/bash
-- /opt/setup-certs-and-run/setup-certs-and-run.sh
 
-image2:
+imageFilebeat:
   name: reqmon-tasks-filebeat
   path: docker.elastic.co/beats/filebeat:7.12.0
+  env:
+  - name: MY_POD_NAME
+    valueFrom:
+      fieldRef:
+        apiVersion: v1
+        fieldPath: metadata.name
+  args: [
+  "-c", "/etc/filebeat.yml",
+  "-e",
+   ]
 
-image2resources:
+imageFilebeatResources:
   requests:
     memory: "50Mi"
     cpu: "50m"
-
-image2env:
-- name: MY_POD_NAME
-  valueFrom:
-    fieldRef:
-      apiVersion: v1
-      fieldPath: metadata.name
 
 ingress:
   enabled: false
@@ -101,6 +98,16 @@ ingress:
   #    hosts:
   #      - chart-example.local
 
+livenessProbe:
+  exec:
+    command:
+    - cmsweb-ping
+    - "--url=http://localhost:8249/wmstatsserver/data/info"
+    - "--authz=/etc/hmac/hmac"
+    - -verbose
+    - "0"
+  initialDelaySeconds: 120
+  periodSeconds: 10
 
 autoscaling:
   enabled: false

@@ -6,7 +6,7 @@ metadata:
     {{- include "reqmon-tasks.labels" . | nindent 4 }}
 spec:
   {{- if not .Values.autoscaling.enabled }}
-  replicas : {{ .Values.replicaCount}}     
+  replicas: {{ .Values.replicaCount}}     
   {{- end }}
   selector:
     matchLabels:
@@ -29,14 +29,14 @@ spec:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
       containers:
         - name: {{ .Chart.Name }}
-          securityContext:
-            {{- toYaml .Values.securityContext | nindent 12 }}
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command:
+          {{- toYaml .Values.image.command | nindent 10 }}
+          securityContext:
+          {{- toYaml .Values.securityContext | nindent 12 }}
           livenessProbe:
           {{- toYaml .Values.livenessProbe | nindent 12 }}
-          command:
-          {{- toYaml .Values.command | nindent 10 }}
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
           volumeMounts:
@@ -60,16 +60,13 @@ spec:
 {{- if or .Values.environment.prod .Values.environment.preprod }}
           - name: logs
             mountPath: /data/srv/logs/reqmon-tasks
-        - name: {{ .Values.image2.name }}
-          image: {{ .Values.image2.name }}
-          args: [
-            "-c", "/etc/filebeat.yml",
-            "-e",
-          ]
-          env:
-          {{- toYaml .Values.image2env | nindent 10 }}
+        - name: {{ .Values.imageFilebeat.name }}
+          image: {{ .Values.imageFilebeat.path }}
+          env: 
+          {{- toYaml .Values.imageFilebeat.env | nindent 10 }}
+          args: {{ .Values.imageFilebeat.args }}
           resources:
-          {{- toYaml .Values.image2resources | nindent 12 }}
+          {{- toYaml .Values.imageFilebeatResources | nindent 12 }}
           volumeMounts:
           - name: logs
             mountPath: /data/srv/logs/reqmon-tasks
@@ -84,6 +81,8 @@ spec:
           - name: varlibdockercontainers
             mountPath: /var/lib/docker/containers
             readOnly: true
+          securityContext:
+          {{- toYaml .Values.imageFilebeatSecurityContext | nindent 12 }}
 {{- end }}
       volumes:
       - name: proxy-secrets

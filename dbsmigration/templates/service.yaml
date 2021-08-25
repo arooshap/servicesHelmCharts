@@ -1,9 +1,11 @@
-apiVersion: v1
 kind: Service
+apiVersion: v1
 metadata:
-  name: {{ include "dbsmigration.fullname" . }}
-  labels:
-    {{- include "dbsmigration.labels" . | nindent 4 }}
+  name: dbsmigration
+  namespace: dbs
+spec:
+  selector:
+    app: dbsmigration
 spec:
   type: {{ .Values.service.type }}
   ports:

@@ -4,9 +4,14 @@ metadata:
   name: {{ include "dbs-migrate.fullname" . }}
   labels:
     {{- include "dbs-migrate.labels" . | nindent 4 }}
+  namespace: dbs
 spec:
   {{- if not .Values.autoscaling.enabled }}
-  replicas: {{ .Values.replicaCount }}
+  {{- if or .Values.environment.prod .Values.environment.preprod}}
+  replicas: {{ .Values.replicaCount.prod }}
+  {{- else }}
+  replicas: {{ .Values.replicaCount.test }}
+  {{- end }}
   {{- end }}
   selector:
     matchLabels:
@@ -28,6 +33,7 @@ spec:
         {{- if .Values.environment.test}}
         env: k8s
         {{- end }}
+        job: dbs-migrate
     spec:
       {{- with .Values.imagePullSecrets }}
       imagePullSecrets:
@@ -38,10 +44,10 @@ spec:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
       containers:
         - name: {{ .Chart.Name }}
-          securityContext:
-            {{- toYaml .Values.securityContext | nindent 12 }}
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
           ports:
            - containerPort: {{ .Values.service.port }}
              name: {{ .Values.service.name }}
@@ -52,10 +58,16 @@ spec:
            - containerPort: {{ .Values.serviceCpyMon.port }}
              name: {{ .Values.serviceCpyMon.name }}
              protocol: {{ .Values.serviceCpyMon.protocol }}
-          livenessProbe:
-          {{- toYaml .Values.livenessProbe | nindent 12 }}
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
+          command:
+            {{- toYaml .Values.image.command | nindent 10 }}
+          livenessProbe:
+          {{- if .Values.environment.prod}}
+          {{- toYaml .Values.livenessProbe | nindent 12 }}
+          {{- else }}
+          {{- toYaml .Values.livenessProbePreProd | nindent 12 }}
+          {{- end }}
           volumeMounts:
           - name: proxy-secrets
             mountPath: /etc/proxy
@@ -77,16 +89,14 @@ spec:
           {{- if or .Values.environment.prod .Values.environment.preprod }}
           - name: logs
             mountPath: /data/srv/logs/dbs
-        - name: {{ .Values.image2.name }}
-          image: {{ .Values.image2.path }}
-          args: [
-            "-c", "/etc/filebeat.yml",
-            "-e",
-          ]
+        - name: {{ .Values.imageFilebeat.name }}
+          image: {{ .Values.imageFilebeat.path }}
           env:
-          {{- toYaml .Values.image2env | nindent 10 }}
+          {{- toYaml .Values.imageFilebeat.env | nindent 10 }}
+          args:
+          {{- toYaml .Values.imageFilebeat.args | nindent 10 }}
           resources:
-          {{- toYaml .Values.image2resources | nindent 12 }}
+          {{- toYaml .Values.imageFilebeatResources | nindent 12 }}
           volumeMounts:
           - name: logs
             mountPath: /data/srv/logs/dbs
@@ -101,6 +111,8 @@ spec:
           - name: varlibdockercontainers
             mountPath: /var/lib/docker/containers
             readOnly: true
+          securityContext:
+          {{- toYaml .Values.imageFilebeatSecurityContext | nindent 12 }}
           {{- end }}
       volumes:
       - name: proxy-secrets
@@ -124,7 +136,12 @@ spec:
 {{- if or .Values.environment.prod .Values.environment.preprod }}
       - name: logs
         persistentVolumeClaim:
-            claimName: logs-cephfs-claim-dbs
+{{- if .Values.environment.preprod }}
+            claimName: logs-cephfs-claim-preprod-dbs
+{{- end }}
+{{- if .Values.environment.prod }}
+            claimName: logs-cephfs-claim-prod-dbs
+{{- end }}
       - name: varlog
         hostPath:
           path: /var/log

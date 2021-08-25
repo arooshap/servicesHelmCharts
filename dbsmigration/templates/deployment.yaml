@@ -6,10 +6,10 @@ metadata:
     {{- include "dbsmigration.labels" . | nindent 4 }}
 spec:
   {{- if not .Values.autoscaling.enabled }}
-  {{- if or .Values.environment.prod .Values.environment.preprod }}
-  replicas: 5
+  {{- if or .Values.environment.prod .Values.environment.preprod}}
+  replicas: {{ .Values.replicaCount.prod }}
   {{- else }}
-  replicas : {{ .Values.replicaCount}}     
+  replicas: {{ .Values.replicaCount.test }}
   {{- end }}
   {{- end }}
   selector:
@@ -42,10 +42,10 @@ spec:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
       containers:
         - name: {{ .Chart.Name }}
-          securityContext:
-            {{- toYaml .Values.securityContext | nindent 12 }}
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
           ports:
            - containerPort: {{ .Values.service.port }}
              name: {{ .Values.service.name }}
@@ -57,7 +57,7 @@ spec:
              name: {{ .Values.serviceCpyMon.name }}
              protocol: {{ .Values.serviceCpyMon.protocol }}
           command:
-          {{- toYaml .Values.command | nindent 10 }}
+          {{- toYaml .Values.image.command | nindent 10 }}
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
           volumeMounts:
@@ -81,16 +81,14 @@ spec:
 {{- if or .Values.environment.prod .Values.environment.preprod }}
           - name: logs
             mountPath: /data/srv/logs/dbsmigration
-        - name: {{ .Values.image2.name }}
-          image: {{ .Values.image2.path }}
-          args: [
-            "-c", "/etc/filebeat.yml",
-            "-e",
-          ]
+        - name: {{ .Values.imageFilebeat.name }}
+          image: {{ .Values.imageFilebeat.path }}
           env:
-          {{- toYaml .Values.image2env | nindent 10}}   
+          {{- toYaml .Values.imageFilebeat.env | nindent 10 }}
+          args:
+          {{- toYaml .Values.imageFilebeat.args | nindent 10 }}
           resources:
-          {{- toYaml .Values.image2resources | nindent 12 }}
+          {{- toYaml .Values.imageFilebeatResources | nindent 12 }}
           volumeMounts:
           - name: logs
             mountPath: /data/srv/logs/dbsmigration
@@ -104,6 +102,8 @@ spec:
             mountPath: /var/log
           - name: varlibdockercontainers
             mountPath: /var/lib/docker/containers
+          securityContext:
+          {{- toYaml .Values.imageFilebeatSecurityContext | nindent 12 }}
 {{- end }}
       volumes:
       - name: proxy-secrets
@@ -126,6 +126,7 @@ spec:
           name: dbsmigration
 {{- if or .Values.environment.prod .Values.environment.preprod }}
       - name: logs
+        persistentVolumeClaim:
 {{- if .Values.environment.preprod }}
             claimName: logs-cephfs-claim-preprod-dbs
 {{- end }}

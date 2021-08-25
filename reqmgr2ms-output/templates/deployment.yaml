@@ -19,7 +19,6 @@ spec:
       {{- end }}
       labels:
         {{- include "reqmgr2ms-output.selectorLabels" . | nindent 8 }}
-        app: {{ .Values.labelsValues.app }}
         {{- if .Values.environment.preprod}}
         env: k8s-preprod
         {{- end }}
@@ -39,10 +38,10 @@ spec:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
       containers:
         - name: {{ .Chart.Name }}
-          securityContext:
-            {{- toYaml .Values.securityContext | nindent 12 }}
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
+          securityContext:
+          {{- toYaml .Values.securityContext | nindent 12 }}
           ports:
            - containerPort: {{ .Values.service.port }}
              name: {{ .Values.service.name }}
@@ -52,10 +51,10 @@ spec:
              protocol: {{ .Values.serviceMon.protocol }}
           lifecycle:
           {{- toYaml .Values.lifecycle | nindent 12 }}
+          command:
+          {{- toYaml .Values.image.command | nindent 10 }}
           livenessProbe:
           {{- toYaml .Values.livenessProbe | nindent 12 }}
-          command:
-          {{- toYaml .Values.command | nindent 10 }}
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
           volumeMounts:
@@ -79,16 +78,13 @@ spec:
 {{- if or .Values.environment.prod .Values.environment.preprod }}
           - name: logs
             mountPath: /data/srv/logs/reqmgr2ms
-        - name: {{ .Values.image2.name }}
-          image: {{ .Values.image2.name }}
-          args: [
-            "-c", "/etc/filebeat.yml",
-            "-e",
-          ]
+        - name: {{ .Values.imageFilebeat.name }}
+          image: {{ .Values.imageFilebeat.path }}
           env:
-          {{- toYaml .Values.image2env | nindent 10 }}
+          {{- toYaml .Values.imageFilebeat.env | nindent 10 }}
+          args: {{ .Values.imageFilebeat.args }}
           resources:
-          {{- toYaml .Values.image2resources | nindent 12 }}
+          {{- toYaml .Values.imageFilebeatResources | nindent 12 }}
           volumeMounts:
           - name: logs
             mountPath: /data/srv/logs/reqmgr2ms
@@ -103,6 +99,8 @@ spec:
           - name: varlibdockercontainers
             mountPath: /var/lib/docker/containers
             readOnly: true
+          securityContext:
+          {{- toYaml .Values.imageFilebeatSecurityContext | nindent 12 }}
 {{- end }}
       initContainers:
       {{- toYaml .Values.initContainers | nindent 6 }}

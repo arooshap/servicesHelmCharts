@@ -1,26 +1,27 @@
-# Default values for reqmgr2ms.
+# Default values for reqmgr2ms-monitor.
 # This is a YAML-formatted file.
 # Declare variables to be passed into your templates.
-
 replicaCount: 1
 
 image:
   repository: cmssw/reqmgr2ms
-  pullPolicy: IfNotPresent
+  pullPolicy: Always
   # Overrides the image tag whose default is the chart appVersion.
-  tag: "latest"
+  tag: "HG2108h-v3"
+  name: ms-monitor
+  command:
+  - /bin/bash
+  - /opt/setup-certs-and-run/setup-certs-and-run.sh
 
 imagePullSecrets: []
-nameOverride: ""
-fullnameOverride: ""
+nameOverride: "ms-monitor"
+fullnameOverride: "ms-monitor"
 
 environment:
   prod: false
   preprod: false
   test : false
 
-labelsValues:
-  app: ms-monitor
 
 serviceAccount:
   # Specifies whether a service account should be created
@@ -38,16 +39,21 @@ lifecycle:
       - bash
       - -c
       - sudo chmod 0777 /data/srv/logs/reqmgr2ms; sudo chown _reqmgr2ms:_reqmgr2ms /data/srv/logs/reqmgr2ms
+
 podAnnotations: 
   prometheus.io/scrape: 'true'
   prometheus.io/port: "18248"
 
-podSecurityContext: 
-  runAsUser: 0
-  runAsGroup: 0
-
 securityContext: 
   privileged: true
+
+podSecurityContext:
+  runAsUser: 1000
+  runAsGroup: 1000
+  fsGroup: 2000
+
+imageFilebeatSecurityContext:
+  allowPrivilegeEscalation: false
 
 service:
   type: ClusterIP
@@ -59,17 +65,6 @@ serviceMon:
   port: 18248
   protocol: TCP
   name: ms-monitor-mon
-
-livenessProbe:
-  exec:
-    command:
-    - cmsweb-ping
-    - "--url=http://localhost:8248/ms-monitor/data/status"
-    - "--authz=/etc/hmac/hmac"
-    - -verbose
-    - "0"
-  initialDelaySeconds: 120
-  periodSeconds: 10
 
 initContainers:
 - name: checkmongodb
@@ -84,25 +79,36 @@ resources:
     memory: "3Gi"
     cpu: "1000m"
 
-command:
-- /bin/bash
-- /opt/setup-certs-and-run/setup-certs-and-run.sh
 
-image2:
+imageFilebeat:
   name: ms-monitor-filebeat
   path: docker.elastic.co/beats/filebeat:7.12.0
+  env:
+  - name: MY_POD_NAME
+    valueFrom:
+      fieldRef:
+        apiVersion: v1
+        fieldPath: metadata.name
+  args: [
+  "-c", "/etc/filebeat.yml",
+  "-e",
+   ]
 
-image2resources:
+imageFilebeatResources:
   requests:
     memory: "50Mi"
     cpu: "50m"
 
-image2env:
-- name: MY_POD_NAME
-  valueFrom:
-    fieldRef:
-      apiVersion: v1
-      fieldPath: metadata.name
+livenessProbe:
+  exec:
+    command:
+    - cmsweb-ping
+    - "--url=http://localhost:8248/ms-monitor/data/status"
+    - "--authz=/etc/hmac/hmac"
+    - -verbose
+    - "0"
+  initialDelaySeconds: 120
+  periodSeconds: 10
 
 ingress:
   enabled: false

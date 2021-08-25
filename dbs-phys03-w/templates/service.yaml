@@ -18,7 +18,6 @@ spec:
   - port: {{ .Values.serviceCpyMon.port }}
     protocol: {{ .Values.serviceCpyMon.protocol }}
     name: {{ .Values.serviceCpyMon.name }}
-    targetPort: {{ .Values.serviceCpyMon.port}}
-
+    targetPort: {{ .Values.serviceCpyMon.port }}
   selector:
     {{- include "dbs-phys03-w.selectorLabels" . | nindent 4 }}
