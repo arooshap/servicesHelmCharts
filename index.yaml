@@ -1,0 +1,14 @@
+apiVersion: v1
+entries:
+  crabcache:
+  - apiVersion: v2
+    appVersion: 1.16.0
+    created: "2021-08-26T12:38:04.004600422+02:00"
+    description: A Helm chart for Kubernetes
+    digest: 28455849221812713061a724eba26df90c4fe2b31bd3334759fd31d2cc431f1f
+    name: crabcache
+    type: application
+    urls:
+    - https://arooshap.github.io/servicesHelmCharts/cmsweb-helm-repo/crabcache-0.1.0.tgz
+    version: 0.1.0
+generated: "2021-08-26T12:38:03.983445451+02:00"
